@@ -1,0 +1,163 @@
+##This is an example of an Rscript that was used to print the trees in the file. 
+#Open libraries
+library(ape)
+library(stringr)
+library(stringi)
+library(treeio)
+library(ggtree)
+library(ggplot2)
+
+#Set working directory to where files are
+setwd("E://Solanum_Phylogeny_Project/02_supermatrix/03_mrbayes/00_RESULTS/final")
+
+#dir() #Shows what files are in the director
+
+#############
+#Open tree and drop tips that are not relevant. Ignore this section for now.
+
+read.beast("Solanum_out.tree")->beast
+#drop.tip : drop tips that are relevant.
+
+#read.mrbayes("rpl32.nex.con.tre")->rpl32
+#drop.tip(rpl32,c("S._aureum"))->rpl32_corrected
+
+################
+# Next section is about setting up the files + script for adding names so they have the clade names attached to the tips.
+
+setwd("E://Solanum_Phylogeny_Project/02_supermatrix/03_mrbayes/00_RESULTS/Final")
+
+#ADD CLADE2 names to tree.
+# load th file that contains the clade info.
+clade<-read.csv("E://Solanum_Phylogeny_Project/02_supermatrix/02_raxml/06_23_2020/00_RESULTS/solanum_clades_acc_mod.csv",header=TRUE,sep=";")
+colnames(clade)
+dim(clade)
+colnames(clade)[1]<-"FULLNAME"
+
+species<-word(clade$FULLNAME,2,sep=" ")
+species
+clade$newname<-paste("S._",species,"_",clade$CLADE2,sep="")
+clade$oldname<-paste("S._",species,sep="")
+
+head(clade)
+clade$newname[1]<-"J._procumbens_Jaltomata"
+clade$newname[2]<-"J._sinuosa_Jaltomata"
+clade$newname[3]<-"J._dentata_Jaltomata"
+clade$newname[4]<-"J._bicolor_Jaltomata"
+
+clade$oldname[1]<-"J._procumbens"
+clade$oldname[2]<-"J._sinuosa"
+clade$oldname[3]<-"J._dentata"
+clade$oldname[4]<-"J._bicolor"
+
+recoderFunc <- function(data, oldvalue, newvalue) {
+  
+  # convert any factors to characters
+  
+  if (is.factor(data))     data     <- as.character(data)
+  if (is.factor(oldvalue)) oldvalue <- as.character(oldvalue)
+  if (is.factor(newvalue)) newvalue <- as.character(newvalue)
+  
+  # create the return vector
+  
+  newvec <- data
+  
+  # put recoded values into the correct position in the return vector
+  
+  for (i in unique(oldvalue)) newvec[data == i] <- newvalue[oldvalue == i]
+  
+  newvec
+  
+}
+
+
+##########
+#Import tree and changes it's names to have associated clades
+
+f.tr<-dir(pattern="*.tre")
+f.tr #to see what number is the tree of interest.
+
+  #Specify tee of interest
+  i<-1
+  print(f.tr[i])
+ tr<-read.beast(f.tr[i])
+ #Alternative is #tr<-beast
+
+#################  
+#search and replace the tip names of the trees. 
+  
+  newnames<-recoderFunc(tr@phylo$tip.label, clade$oldname, clade$newname)
+  tr@phylo$tip.label<-newnames
+  tr2<-tr
+  tr2<-treeio::root(tr,"J._bicolor_Jaltomata")
+  
+
+#################  
+#Now printing the tree with ggtree
+    z<-ggtree(tr, ladderize=T)+
+    
+    #Add a title
+    ggtitle(f.tr[i])+
+    # Adds tip labels
+    geom_tiplab(color="black",size=1.5) +
+    # Adds posterior probability values 
+    geom_text2(aes(subset = !isTip, label=round(posterior,digits=2)),size=1.5, hjust=1.25,vjust=1.5,fontface="italic")
+  
+
+  #Adds green and orange dots to nodes according to posterior probability values.
+  sanger.z<-z + geom_point2(aes(subset=posterior>=0.75),size=2, shape=21, fill="red") + geom_point2(aes(subset=posterior>=0.95),size=2, shape=21, fill="cyan") + geom_point2(aes(subset=posterior==1.0 & !isTip),size=2, shape=21, fill="cyan")
+
+  #Shows tree on screem
+  sanger.z
+
+  #Saves tree as pdf.
+  ggsave(sanger.z, file=paste(f.tr[i],".pdf",sep=""), width=11, height=40)
+  
+write.tree(tr@phylo,"Clean_Solanum_beast.tre")
+#There are other things you cna do to change the final image, such as the otpion xlim if you want to make the tree less wide, and make the tip labels fit in the graphic.
+
+
+#######################
+#######################
+#This is another version of the script, where you can loop through an entire folder that contains all the tree files of interest, that you want to print out in a folder.
+
+##########
+#Import tree and changes it's names to have associated clades
+
+f.tr<-dir(pattern="*.tre")
+f.tr #to see what number is the tree of interest.
+
+for (i in 1:length(f.tr))
+{
+ print(f.tr[i])
+ tr<-read.beast(f.tr[i])
+
+#################  
+#search and replace the tip names of the trees. 
+  
+  newnames<-recoderFunc(tr@phylo$tip.label, clade$oldname, clade$newname)
+  tr@phylo$tip.label<-newnames
+  tr2<-tr
+  tr2<-treeio::root(tr,"J._bicolor_Jaltomata")
+  
+
+#################  
+#Now printing the tree with ggtree
+    z<-ggtree(tr, ladderize=T)+
+    
+    #Add a title
+    ggtitle(f.tr[i])+
+    # Adds tip labels
+    geom_tiplab(color="black",size=1.5) +
+    # Adds posterior probability values 
+    geom_text2(aes(subset = !isTip, label=round(posterior,digits=2)),size=1.5, hjust=1.25,vjust=1.5,fontface="italic")
+  
+
+  #Adds green and orange dots to nodes according to posterior probability values.
+  sanger.z<-z + geom_point2(aes(subset=posterior>=0.75),size=2, shape=21, fill="red") + geom_point2(aes(subset=posterior>=0.95),size=2, shape=21, fill="cyan") + geom_point2(aes(subset=posterior==1.0 & !isTip),size=2, shape=21, fill="cyan")
+
+  #Shows tree on screem
+  sanger.z
+
+  #Saves tree as pdf.
+  ggsave(sanger.z, file=paste(f.tr[i],".pdf",sep=""), width=11, height=40)
+}
